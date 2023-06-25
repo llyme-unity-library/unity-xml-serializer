@@ -83,6 +83,9 @@ public class IWantToBeSerialized
   [SerializeField]
   private string i_will_be_serialized = "yes i will";
   public bool i_will_also_be_serialized = true;
+
+  [field: SerializeField]
+  public string Properties_As_Well { get; set; } = "nice";
 }
 ```
 
