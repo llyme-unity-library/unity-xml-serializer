@@ -14,6 +14,11 @@ And back
 # Overview
 Transforms unity `Objects` into `Xml`, including `Components`. Supports circular referencing.
 
+# Requirements
+* [XmlHelper](https://github.com/llyme-unity-library/unity-xml-helper)
+* [TypeHelper](https://github.com/llyme-unity-library/unity-type-helper)
+* [TextHelper](https://github.com/llyme-unity-library/unity-text-helper)
+
 # How to Use
 Inherit the `Serialize` and `Deserialize` classes.
 
