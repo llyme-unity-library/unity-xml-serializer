@@ -1,0 +1,18 @@
+{
+    "name": "UnityXmlSerializer",
+    "rootNamespace": "UnityXmlSerializer",
+    "references": [
+        "GUID:00ede7552111e8a4abe4b07571e9616b",
+        "GUID:a8a1d5bca6c5ef443879e6fe82a6d150",
+        "GUID:6e17303a7eda2044b95035f69dde5dc3"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
