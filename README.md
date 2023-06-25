@@ -14,8 +14,17 @@ And back
 # Overview
 Transforms unity `Objects` into `Xml`, including `Components`. Supports circular referencing.
 
+# Requirements
+* [XmlHelper](https://github.com/llyme-unity-library/unity-xml-helper)
+* [TypeHelper](https://github.com/llyme-unity-library/unity-type-helper)
+* [TextHelper](https://github.com/llyme-unity-library/unity-text-helper)
+
 # How to Use
 Inherit the `Serialize` and `Deserialize` classes.
+
+It is adviced that the `Resolver` virtual functions be overridden to fully
+utilize the serializer, as some objects (such as `Materials`, `Textures`, etc.)
+may not be serialized and deserialized properly.
 
 ```csharp
 public class Serialize : UnityXmlSerializer.Serialize<Serialize>
@@ -61,4 +70,36 @@ IEnumerator Do()
 
 // Loop through the enumerator!
 StartCoroutine(Do());
+```
+
+# Tips
+
+You can use Unity's `[SerializeField]` attribute to forcefully serialize fields.
+
+```csharp
+public class IWantToBeSerialized
+{
+  private int i_will_not_be_serialized = 42;
+  [SerializeField]
+  private string i_will_be_serialized = "yes i will";
+  public bool i_will_also_be_serialized = true;
+
+  [field: SerializeField]
+  public string Properties_As_Well { get; set; } = "nice";
+}
+```
+
+You can use `[IgnoreParentValue]` attribute to create an entirely new instance instead of using what's already inside the object.
+This is useful when you are dealing with arrays and dictionaries.
+
+```csharp
+public class SomeClass
+{
+  [IgnoreParentValue]
+  public List<string> = new() // When deserialized, the `new()` will be overridden.
+  {
+    "Hello", // You won't see this one from a deserialized object.
+    "World" // You won't see this either.
+  };
+}
 ```
