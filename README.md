@@ -74,7 +74,7 @@ StartCoroutine(Do());
 
 # Tips
 
-You can use Unity's `[SerializeField]` attribute to forcefully serialize non-literal fields.
+You can use Unity's `[SerializeField]` attribute to forcefully serialize fields.
 
 ```csharp
 public class IWantToBeSerialized
