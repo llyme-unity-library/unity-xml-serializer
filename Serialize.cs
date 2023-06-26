@@ -12,7 +12,7 @@ namespace UnityXmlSerializer
 	/// Serializes public fields by default.
 	/// <br></br>
 	/// `SerializeField` attribute allows
-	/// any non-literal fields and properties to be serialized.
+	/// non-literal fields and properties to be serialized.
 	/// </summary>
 	public abstract partial class Serialize<T> where T : Serialize<T>
 	{

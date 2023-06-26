@@ -2,17 +2,7 @@
 
 namespace UnityXmlSerializer
 {
-	/// <summary>
-	/// Serializes an object.
-	/// <br></br>
-	/// Preserves references.
-	/// <br></br>
-	/// Serializes public fields by default.
-	/// <br></br>
-	/// `SerializeField` attribute allows
-	/// any non-literal fields and properties to be serialized.
-	/// </summary>
-	public abstract partial class Serialize<T> where T : Serialize<T>
+	public partial class Serialize<T>
 	{
 		private bool Defer_Object_Component
 			(object @object,
