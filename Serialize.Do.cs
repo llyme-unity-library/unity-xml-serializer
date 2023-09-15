@@ -18,11 +18,11 @@ namespace UnityXmlSerializer
 				RootNodeName
 			);
 
-		private void Do_Internal
-			(Type type,
-			object @object,
-			bool inGameObject,
-			string name)
+		void Do_Internal
+		(Type type,
+		object @object,
+		bool inGameObject,
+		string name)
 		{
 			if (Attribute.IsDefined(type, Tools.NON_SERIALIZED))
 				return;
@@ -34,17 +34,16 @@ namespace UnityXmlSerializer
 			Writer.WriteEndElement();
 		}
 
-		private void Do_Object_Type
-			(Type type)
+		void Do_Object_Type(Type type)
 		{
 			Writer.WriteAttributeString("type", type.FullName);
 			Writer.WriteAttributeString("assembly", type.Assembly.FullName);
 		}
-
-		private void Do_Object
-			(Type type,
-			object @object,
-			bool inGameObject)
+		
+		void Do_Object
+		(Type type,
+		object @object,
+		bool inGameObject)
 		{
 			// Null
 
@@ -55,12 +54,6 @@ namespace UnityXmlSerializer
 			// Primitive/Common/Base Types
 
 			if (Write_Common(type, @object))
-				return;
-
-
-			// Special Types
-
-			if (Write_Special(type, @object))
 				return;
 
 
@@ -96,10 +89,20 @@ namespace UnityXmlSerializer
 			}
 
 			Writer.WriteAttributeString("id", id.ToString());
+
+
+			// Special Types
+
+			if (Write_Special(type, @object))
+				return;
+				
+				
+			// Generic Types
+				
 			Do_Object_Type(type);
 
 
-			// Custom Types
+			// Specific Types
 
 			switch (@object)
 			{
@@ -119,26 +122,39 @@ namespace UnityXmlSerializer
 					Do_Enumerable(type, enumerable);
 					break;
 			}
+			
+			
+			// Unity Objects
 
+			BeforeObjectMembers(type, @object);
 			Do_Members(@object);
 		}
-
-		private void Do_Members
-			(object @object)
+		
+		void Do_Members(object @object)
 		{
 			bool PropertyFilter(string key, PropertyInfo info)
 			{
-				if (Filter.GameObjectFilter(@object, key, out bool flag))
-					return flag;
-
+				bool shouldWrite = true;
+				
+				if (MemberInfoResolver(@object, key, ref shouldWrite))
+					return shouldWrite;
+					
+				if (MIR_Default(@object, key, ref shouldWrite))
+					return shouldWrite;
+					
 				return Attribute.IsDefined(info, Tools.SERIALIZE_FIELD);
 			}
 
 			bool FieldFilter(string key, FieldInfo info)
 			{
-				if (Filter.GameObjectFilter(@object, key, out bool flag))
-					return flag;
-
+				bool shouldWrite = true;
+				
+				if (MemberInfoResolver(@object, key, ref shouldWrite))
+					return shouldWrite;
+					
+				if (MIR_Default(@object, key, ref shouldWrite))
+					return shouldWrite;
+				
 				if (info.IsLiteral)
 					return false;
 
@@ -187,7 +203,7 @@ namespace UnityXmlSerializer
 			Writer.WriteEndElement();
 		}
 
-		private void Do_Dictionary
+		void Do_Dictionary
 			(Type type,
 			IDictionary dictionary)
 		{
@@ -225,7 +241,7 @@ namespace UnityXmlSerializer
 			Writer.WriteEndElement();
 		}
 
-		private void Do_Enumerable
+		void Do_Enumerable
 			(Type type,
 			IEnumerable enumerable)
 		{

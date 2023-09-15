@@ -56,8 +56,8 @@ namespace UnityXmlSerializer
 		/// Writes special case objects when applicable.
 		/// </summary>
 		protected bool Write_Special
-			(Type type,
-			object @object)
+		(Type type,
+		object @object)
 		{
 			switch (@object)
 			{

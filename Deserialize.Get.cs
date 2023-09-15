@@ -87,12 +87,6 @@ namespace UnityXmlSerializer
 		{
 			string raw = node.InnerText;
 			
-			if (TryStringifyResolver(type, raw, out object resolved_value)) 
-			{
-				value = resolved_value;
-				return true;
-			}
-			
 			if (node.EmptyOrText())
 				return TryParseString(
 					type,

@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Xml;
+using TextHelper;
 using UnityEngine;
 using XmlHelper;
 
@@ -7,48 +10,71 @@ namespace UnityXmlSerializer
 {
 	public partial class Deserialize<T>
 	{
-		protected virtual bool BeforeDeserializeGameObjectResolver
-		(XmlNode node,
-		object value)
+		bool BDGOR_Default(XmlNode node, object value)
 		{
-			if (value == null)
-				return false;
-
 			XmlNode members = node.Element("Members");
-
+			
 			switch (value)
 			{
+				case Animator animator:
+					void AnimatorOnFinish()
+					{
+						RuntimeAnimatorController rac =
+							animator.runtimeAnimatorController;
+						
+						if (rac == null)
+							return;
+						
+						animator.runtimeAnimatorController = null;
+						animator.runtimeAnimatorController = rac;
+					}
+				
+					OnFinish += AnimatorOnFinish;
+					return false;
+				
 				case GameObject @object:
 					@object.name = members.StringOf("name");
 					@object.layer = members.IntOf("layer");
-					@object.isStatic = members.BoolOf("isStatic");
-					@object.tag = members.StringOf("tag");
-					@object.SetActive(members.BoolOf("activeSelf"));
+					@object.isStatic = members.BoolOf("isStatic", false);
+					@object.tag = members.StringOf("tag", @default: "Untagged");
+					@object.SetActive(members.BoolOf("activeSelf", false));
 
-					return false;
+					return true;
 
 				case Transform transform:
 					transform.localPosition = members.Vector3Of("localPosition");
 					transform.localRotation = members.QuaternionOf("localRotation");
 					transform.localScale = members.Vector3Of("localScale");
+					return true;
+				
+				case EdgeCollider2D edge:
+					List<Vector2> points =
+						node
+						.Element("Points")
+						.Elements("Point")
+						.Select(v => v.InnerText.Vector2())
+						.ToList();
+
+					void Listener() =>
+						edge.SetPoints(points);
+
+					OnFinish += Listener;
 					return false;
 			}
-
-			return true;
-		}
 			
+			return false;
+		}
+		
 		/// <summary>
-		/// Allows a user to create user-defined de-stringification.
-		/// <br>
-		/// If a type is unknown,
-		/// use this to resolve them.
+		/// Allows resolving how Unity GameObjects are parsed.
 		/// </summary>
-		protected virtual bool TryStringifyResolver
-		(Type type,
-		string raw,
-		out object value)
+		/// <returns>
+		/// `true` to prevent defaults.
+		/// </returns>
+		protected virtual bool BeforeDeserializeGameObjectResolver
+		(XmlNode node,
+		object value)
 		{
-			value = null;
 			return false;
 		}
 		
@@ -68,7 +94,7 @@ namespace UnityXmlSerializer
 		}
 		
 		protected virtual void BeforeDeserializeComponentResolver
-		(Type type, GameObject gameObject)
+		(XmlNode node, Type type, GameObject gameObject)
 		{
 		}
 	}

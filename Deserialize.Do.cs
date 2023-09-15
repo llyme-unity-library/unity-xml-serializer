@@ -12,6 +12,9 @@ namespace UnityXmlSerializer
 	{
 		public IEnumerator Do()
 		{
+			if (Done)
+				throw new Exception("This should only be called once!");
+				
 			yield return Do_Internal(Node, null);
 
 			Payload payload = payloads.Pop();
@@ -23,6 +26,8 @@ namespace UnityXmlSerializer
 				@object.AfterFullDeserialize();
 				yield return null;
 			}
+			
+			OnFinish?.Invoke();
 
 			Done = true;
 		}
@@ -34,14 +39,21 @@ namespace UnityXmlSerializer
 		/// <br></br>
 		/// boolean = if the payload is deferred.
 		/// </summary>
-		private IEnumerator Do_Internal
-			(XmlNode node,
-			object value)
+		IEnumerator Do_Internal
+		(XmlNode node,
+		object value)
 		{
+			// Try any deferred actions.
+			
 			yield return Do_Deferment();
+			
+			
+			// Setup payload for this object.
 
 			Payload resultPayload = new()
 			{
+				// Use current value as default.
+				// Useful with arrays and readonly structures.
 				@object = value
 			};
 			payloads.Push(resultPayload);
@@ -68,6 +80,7 @@ namespace UnityXmlSerializer
 					yield break;
 				}
 
+				// Referenced object is yet to be deserialized.
 				// Defer it.
 
 				bool Condition() =>
@@ -81,7 +94,7 @@ namespace UnityXmlSerializer
 					yield break;
 				}
 
-				yield return Defer(Condition, Action);
+				yield return Defer(Condition, Action());
 
 				// Mark as deferred.
 				resultPayload.boolean = true;
@@ -97,9 +110,18 @@ namespace UnityXmlSerializer
 				// Unknown data type.
 				// Return as is.
 				yield break;
+				
+				
+			// Resolver
+			
+			if (ObjectResolver(type, node, out object resolved_value))
+			{
+				resultPayload.@object = resolved_value;
+				yield break;
+			}
 
 
-			// Special Types
+			// Unity Events
 
 			yield return Do_UnityEventBase(
 				node,
@@ -113,6 +135,22 @@ namespace UnityXmlSerializer
 				// Deserialized a UnityEventBase.
 				// Return as is.
 				yield break;
+				
+				
+			// Type Objects
+
+			if (Tools.TYPE.IsAssignableFrom(type))
+			{
+				resultPayload.@object =
+					TypeHelper.Generic.FromFullName(
+						node.StringOf("Assembly"),
+						node.StringOf("Type")
+					);
+				yield break;
+			}
+			
+			
+			// GameObjects
 
 			yield return Do_GameObject(
 				node,
@@ -131,22 +169,6 @@ namespace UnityXmlSerializer
 				// but is not in a GameObject.
 				// Defer it.
 				components[node.Attributes.Int("id")] = node;
-				yield break;
-			}
-
-			if (Tools.TYPE.IsAssignableFrom(type))
-			{
-				resultPayload.@object =
-					TypeHelper.Generic.FromFullName(
-						node.StringOf("Assembly"),
-						node.StringOf("Type")
-					);
-				yield break;
-			}
-			
-			if (ObjectResolver(type, node, out object resolved_value))
-			{
-				resultPayload.@object = resolved_value;
 				yield break;
 			}
 
@@ -192,28 +214,36 @@ namespace UnityXmlSerializer
 				afterFullDeserialize.Add(value1);
 		}
 
-		private IEnumerator Do_Parameters
-			(XmlNode node,
-			Type type,
-			object value)
+		IEnumerator Do_Parameters
+		(XmlNode node,
+		Type type,
+		object value)
 		{
+			if (value == null)
+				yield break;
+				
+			if (BDGOR_Default(node, value))
+				yield break;
+				
 			if (BeforeDeserializeGameObjectResolver(node, value))
-				yield return Do_Members(node, type, value);
+				yield break;
+			
+			yield return Do_Members(node, type, value);
 		}
 		
-		private IEnumerator Do_Members_Internal
-			(Action<object> setter,
-			Payload payload)
+		IEnumerator Do_Members_Internal
+		(Action<object> setter,
+		Payload payload)
 		{
 			OnAfterDeserialize?.Invoke(payload.@object);
 			setter(payload.@object);
 			yield break;
 		}
-
-		private IEnumerator Do_Members
-			(XmlNode node,
-			Type type,
-			object value)
+		
+		IEnumerator Do_Members
+		(XmlNode node,
+		Type type,
+		object value)
 		{
 			IEnumerable<XmlNode> members =
 				node
@@ -256,11 +286,17 @@ namespace UnityXmlSerializer
 				if (memberPayload.boolean)
 				{
 					// Deferred.
-					memberPayload.queue
-						.Enqueue(Do_Members_Internal(
+
+					bool Condition() => !memberPayload.boolean;
+
+					yield return Defer(
+						Condition,
+						Do_Members_Internal(
 							setter,
 							memberPayload
-						));
+						)
+					);
+					
 					continue;
 				}
 
@@ -272,10 +308,10 @@ namespace UnityXmlSerializer
 			}
 		}
 
-		private IEnumerator Do_Dictionary
-			(XmlNode node,
-			Type type,
-			Payload payload)
+		IEnumerator Do_Dictionary
+		(XmlNode node,
+		Type type,
+		Payload payload)
 		{
 			if (!node.TryElement("Dictionary", out XmlNode dictionaryNode))
 				yield break;
@@ -320,11 +356,11 @@ namespace UnityXmlSerializer
 					yield break;
 				}
 
-				yield return Defer(Condition, Action);
+				yield return Defer(Condition, Action());
 			}
 		}
 
-		private IEnumerator Do_Enumerable_Array
+		IEnumerator Do_Enumerable_Array
 			(XmlNode node,
 			Type type,
 			Payload payload)
@@ -378,7 +414,7 @@ namespace UnityXmlSerializer
 				deferred.Add(new()
 				{
 					Condition = Condition,
-					Action = Action
+					Action = Action()
 				});
 
 				index++;
@@ -387,7 +423,7 @@ namespace UnityXmlSerializer
 			resultPayload.boolean = true;
 		}
 
-		private IEnumerator Do_Enumerable
+		IEnumerator Do_Enumerable
 			(XmlNode node,
 			Type type,
 			Payload payload)
@@ -427,7 +463,7 @@ namespace UnityXmlSerializer
 				yield break;
 		}
 
-		private IEnumerator Do_Enumerable_Method
+		IEnumerator Do_Enumerable_Method
 			(XmlNode node,
 			Type type,
 			object value)
@@ -469,7 +505,7 @@ namespace UnityXmlSerializer
 					yield break;
 				}
 
-				yield return Defer(Condition, Action);
+				yield return Defer(Condition, Action());
 			}
 
 			resultPayload.boolean = true;

@@ -22,10 +22,12 @@ namespace UnityXmlSerializer
 		/// to a GameObject,
 		/// before the members are serialized.
 		/// </summary>
-		protected readonly List<Action> afterComponentAdded = new();
+		protected readonly List<Action<Component>> afterComponentAdded = new();
 		private readonly Stack<Payload> payloads = new();
 
-		public delegate void OnAfterDeserializeHandler(object @object);
+		public delegate void OnAfterDeserializeDelegate(object @object);
+		
+		public delegate void OnFinishDelegate();
 
 		/// <summary>
 		/// Called whenever something is fully deserialized,
@@ -33,7 +35,9 @@ namespace UnityXmlSerializer
 		/// <br></br>
 		/// This also includes a GameObject's components.
 		/// </summary>
-		public event OnAfterDeserializeHandler OnAfterDeserialize;
+		public event OnAfterDeserializeDelegate OnAfterDeserialize;
+		
+		public event OnFinishDelegate OnFinish;
 
 		/// <summary>
 		/// Base parent for GameObjects.

@@ -1,15 +1,18 @@
-using System.Collections;
-using System.Collections.Generic;
-
 namespace UnityXmlSerializer
 {
 	public partial class Deserialize<T>
 	{
-		private class Payload
+		class Payload
 		{
-			public readonly Queue<IEnumerator> queue = new();
-
+			/// <summary>
+			/// Object value.
+			/// Usually for the object being deserialized.
+			/// </summary>
 			public object @object = null;
+			/// <summary>
+			/// Boolean value.
+			/// Usually for deferment.
+			/// </summary>
 			public bool boolean = false;
 		}
 	}

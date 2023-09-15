@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Xml;
 using UnityEngine;
@@ -37,7 +38,7 @@ namespace UnityXmlSerializer
 						yield break;
 					}
 
-					yield return Defer(Condition, Action);
+					yield return Defer(Condition, Action());
 					continue;
 				}
 
@@ -86,7 +87,7 @@ namespace UnityXmlSerializer
 			if (componentType == null)
 				yield break;
 
-			BeforeDeserializeComponentResolver(componentType, gameObject);
+			BeforeDeserializeComponentResolver(node, componentType, gameObject);
 
 			bool hasComponent =
 				gameObject.TryGetComponent(
@@ -97,9 +98,9 @@ namespace UnityXmlSerializer
 			if (!hasComponent)
 				component = gameObject.AddComponent(componentType);
 
-			foreach (Action action in afterComponentAdded)
+			foreach (Action<Component> action in afterComponentAdded)
 			{
-				action();
+				action(component);
 				yield return null;
 			}
 
@@ -125,8 +126,8 @@ namespace UnityXmlSerializer
 		}
 
 		private IEnumerator Do_Components
-			(XmlNode node,
-			GameObject gameObject)
+		(XmlNode node,
+		GameObject gameObject)
 		{
 			IEnumerable<XmlNode> componentNodes =
 				node
@@ -138,8 +139,8 @@ namespace UnityXmlSerializer
 		}
 
 		private IEnumerator Do_UnityEventBase_Listener_Argument
-			(XmlNode node,
-			PersistentListenerMode mode)
+		(XmlNode node,
+		PersistentListenerMode mode)
 		{
 			Payload resultPayload = new();
 			payloads.Push(resultPayload);
@@ -167,7 +168,7 @@ namespace UnityXmlSerializer
 
 				case PersistentListenerMode.Float:
 					resultPayload.boolean = true;
-					resultPayload.@object = node.FloatOf("Argument");
+					resultPayload.@object = node.FloatOf("Argument", 0f);
 					yield break;
 
 				case PersistentListenerMode.String:
@@ -177,16 +178,49 @@ namespace UnityXmlSerializer
 
 				case PersistentListenerMode.Bool:
 					resultPayload.boolean = true;
-					resultPayload.@object = node.BoolOf("Argument");
+					resultPayload.@object = node.BoolOf("Argument", false);
 					yield break;
 			}
 		}
+		
+		private bool Do_UnityEventBase_Listener_Method_Mode
+		(MethodInfo info,
+		Type parameterType)
+		{
+			ParameterInfo[] @params = info.GetParameters();
+		
+			if (parameterType == null)
+				// Void
+				return @params.Length == 0;
+			
+			return
+				@params.Length == 1 &&
+				@params[0].ParameterType == parameterType;
+		}
+		
+		private bool Do_UnityEventBase_Listener_Method_Bool(MethodInfo info) =>
+			Do_UnityEventBase_Listener_Method_Mode(info, typeof(bool));
+		
+		private bool Do_UnityEventBase_Listener_Method_Float(MethodInfo info) =>
+			Do_UnityEventBase_Listener_Method_Mode(info, typeof(float));
+		
+		private bool Do_UnityEventBase_Listener_Method_Int(MethodInfo info) =>
+			Do_UnityEventBase_Listener_Method_Mode(info, typeof(int));
+		
+		private bool Do_UnityEventBase_Listener_Method_String(MethodInfo info) =>
+			Do_UnityEventBase_Listener_Method_Mode(info, typeof(string));
+
+		private bool Do_UnityEventBase_Listener_Method_Object(MethodInfo info) =>
+			info.GetParameters().Length == 1;
+
+		private bool Do_UnityEventBase_Listener_Method_Void(MethodInfo info) =>
+			Do_UnityEventBase_Listener_Method_Mode(info, null);
 
 		private IEnumerator Do_UnityEventBase_Listener_Method
-			(XmlNode node,
-			object @event,
-			Payload targetPayload,
-			MethodInfo listenerInfo)
+		(XmlNode node,
+		object @event,
+		Payload targetPayload,
+		MethodInfo[] listenerInfos)
 		{
 			// Grab the event's method that will
 			// add the target's method as a listener.
@@ -203,33 +237,87 @@ namespace UnityXmlSerializer
 
 			PersistentListenerMode mode =
 				(PersistentListenerMode)node.IntOf("Mode", 1);
+			
+			
+			// Get the correct listener info.
+			
+			MethodInfo listenerInfo = null;
+			
+			switch (mode)
+			{
+				case PersistentListenerMode.EventDefined:
+					yield return
+						Do_UnityEventBase_Listener_Method_Dynamic(
+							@event,
+							targetPayload,
+							listenerInfos
+							.FirstOrDefault(Do_UnityEventBase_Listener_Method_Object),
+							addListenerInfo
+						);
+					yield break;
+					
+				case PersistentListenerMode.Bool:
+					listenerInfo =
+						listenerInfos
+						.FirstOrDefault(Do_UnityEventBase_Listener_Method_Bool);
+					break;
+					
+				case PersistentListenerMode.Float:
+					listenerInfo =
+						listenerInfos
+						.FirstOrDefault(Do_UnityEventBase_Listener_Method_Float);
+					break;
+					
+				case PersistentListenerMode.Int:
+					listenerInfo =
+						listenerInfos
+						.FirstOrDefault(Do_UnityEventBase_Listener_Method_Int);
+					break;
+					
+				case PersistentListenerMode.Object:
+					listenerInfo =
+						listenerInfos
+						.FirstOrDefault(Do_UnityEventBase_Listener_Method_Object);
+					break;
+					
+				case PersistentListenerMode.String:
+					listenerInfo =
+						listenerInfos
+						.FirstOrDefault(Do_UnityEventBase_Listener_Method_String);
+					break;
+					
+				case PersistentListenerMode.Void:
+					listenerInfo =
+						listenerInfos
+						.FirstOrDefault(Do_UnityEventBase_Listener_Method_Void);
+					break;
+			}
+			
+			if (listenerInfo == null)
+				yield break;
+			
+			// Check the listener mode.
 
-			if (mode == PersistentListenerMode.EventDefined)
-				yield return
-					Do_UnityEventBase_Listener_Method_Dynamic(
-						@event,
-						targetPayload,
-						listenerInfo,
-						addListenerInfo
-					);
-			else
-				yield return
-					Do_UnityEventBase_Listener_Method_Constant(
-						node,
-						@event,
-						targetPayload,
-						listenerInfo,
-						addListenerInfo,
-						mode
-					);
+			yield return
+				Do_UnityEventBase_Listener_Method_Constant(
+					node,
+					@event,
+					targetPayload,
+					listenerInfo,
+					addListenerInfo,
+					mode
+				);
 		}
 
 		private IEnumerator Do_UnityEventBase_Listener_Method_Dynamic
-			(object @event,
-			Payload targetPayload,
-			MethodInfo listenerInfo,
-			MethodInfo addListenerInfo)
+		(object @event,
+		Payload targetPayload,
+		MethodInfo listenerInfo,
+		MethodInfo addListenerInfo)
 		{
+			if (listenerInfo == null)
+				yield break;
+				
 			// Add the the method of the target as is.
 			// The event will pass the arguments.
 
@@ -246,11 +334,11 @@ namespace UnityXmlSerializer
 		}
 
 		private IEnumerator Do_UnityEventBase_Listener_Method_Constant_Internal
-			(object @event,
-			Payload targetPayload,
-			MethodInfo listenerInfo,
-			MethodInfo addListenerInfo,
-			Payload argumentPayload)
+		(object @event,
+		Payload targetPayload,
+		MethodInfo listenerInfo,
+		MethodInfo addListenerInfo,
+		Payload argumentPayload)
 		{
 			object methodTarget = null;
 			MethodInfo methodInfo = null;
@@ -333,19 +421,19 @@ namespace UnityXmlSerializer
 		}
 
 		private IEnumerator Do_UnityEventBase_Listener_Method_Constant
-			(XmlNode node,
-			object @event,
-			Payload targetPayload,
-			MethodInfo listenerInfo,
-			MethodInfo addListenerInfo,
-			PersistentListenerMode mode)
+		(XmlNode node,
+		object @event,
+		Payload targetPayload,
+		MethodInfo listenerInfo,
+		MethodInfo addListenerInfo,
+		PersistentListenerMode mode)
 		{
 			yield return
 				Do_UnityEventBase_Listener_Argument(
 					node,
 					mode
 				);
-
+			
 			Payload argumentPayload = payloads.Pop();
 
 			if (mode != PersistentListenerMode.Object)
@@ -374,22 +462,22 @@ namespace UnityXmlSerializer
 
 				return
 					Do_UnityEventBase_Listener_Method_Constant_Internal(
-							@event,
-							targetPayload,
-							listenerInfo,
-							addListenerInfo,
-							argumentPayload
-						);
+						@event,
+						targetPayload,
+						listenerInfo,
+						addListenerInfo,
+						argumentPayload
+					);
 			}
 
-			yield return Defer(Condition, Action);
+			yield return Defer(Condition, Action());
 		}
 
 		private IEnumerator Do_UnityEventBase_Listener_Internal
-			(XmlNode node,
-			object @event,
-			string methodName,
-			Payload targetPayload)
+		(XmlNode node,
+		object @event,
+		string methodName,
+		Payload targetPayload)
 		{
 			if (targetPayload.@object == null)
 				// Target does not exist.
@@ -397,16 +485,21 @@ namespace UnityXmlSerializer
 
 
 			// Check if the method exists in the target.
-
-			MethodInfo listenerInfo =
+			
+			MethodInfo[] listenerInfos =
 				targetPayload.@object
 				.GetType()
-				.GetMethod(
-					methodName,
-					TypeHelper.Generic.GENERIC_MEMBER_FLAG
-				);
-
-			if (listenerInfo == null)
+				.GetMethods(
+					BindingFlags.Public |
+					BindingFlags.NonPublic |
+					BindingFlags.Instance |
+					BindingFlags.Static |
+					BindingFlags.FlattenHierarchy
+				)
+				.Where(v => v.Name == methodName)
+				.ToArray();
+			
+			if (listenerInfos.Length == 0)
 				// The method does not exist in the target.
 				yield break;
 
@@ -419,7 +512,7 @@ namespace UnityXmlSerializer
 					node,
 					@event,
 					targetPayload,
-					listenerInfo
+					listenerInfos
 				);
 		}
 
@@ -456,7 +549,7 @@ namespace UnityXmlSerializer
 					targetPayload
 				);
 
-			yield return Defer(Condition, Action);
+			yield return Defer(Condition, Action());
 		}
 
 		private IEnumerator Do_UnityEventBase
@@ -497,7 +590,7 @@ namespace UnityXmlSerializer
 
 			if (type != Tools.GAME_OBJECT)
 				yield break;
-
+				
 			GameObject gameObject = payload.@object != null
 				? payload.@object as GameObject
 				: new();

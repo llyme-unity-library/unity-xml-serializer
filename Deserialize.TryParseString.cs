@@ -11,9 +11,9 @@ namespace UnityXmlSerializer
 		/// to the given type.
 		/// </summary>
 		public static bool TryParseString
-			(Type type,
-			string raw,
-			out object value)
+		(Type type,
+		string raw,
+		out object value)
 		{
 			if (type.IsEnum)
 			{
@@ -25,6 +25,15 @@ namespace UnityXmlSerializer
 
 				value = null;
 				return false;
+			}
+			
+			if (type == typeof(byte))
+			{
+				value =
+					byte.TryParse(raw, out byte result)
+					? result
+					: (byte)0;
+				return true;
 			}
 
 			if (type == typeof(string))
@@ -65,6 +74,12 @@ namespace UnityXmlSerializer
 					: 0f;
 				return true;
 			}
+			
+			if (type == typeof(LayerMask))
+			{
+				value = (LayerMask)raw.Int();
+				return true;
+			}
 
 			if (type == typeof(Vector2))
 			{
@@ -84,6 +99,12 @@ namespace UnityXmlSerializer
 				return true;
 			}
 
+			if (type == typeof(Vector3Int))
+			{
+				value = raw.Vector3Int();
+				return true;
+			}
+
 			if (type == typeof(Vector4))
 			{
 				value = raw.Vector4();
@@ -99,6 +120,12 @@ namespace UnityXmlSerializer
 			if (type == typeof(Color))
 			{
 				value = raw.Color();
+				return true;
+			}
+			
+			if (type == typeof(Color32))
+			{
+				value = raw.Color32();
 				return true;
 			}
 

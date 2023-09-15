@@ -5,20 +5,22 @@ namespace UnityXmlSerializer
 {
 	public partial class Deserialize<T>
 	{
-		private readonly struct Deferment
+		readonly struct Deferment
 		{
 			public Func<bool> Condition { get; init; }
 			
-			public Func<IEnumerator> Action { get; init; }
+			public IEnumerator Action { get; init; }
 		}
 		
-		private IEnumerator Defer
-			(Func<bool> condition,
-			Func<IEnumerator> action)
+		IEnumerator Defer
+		(Func<bool> condition,
+		IEnumerator action)
 		{
 			if (condition())
 			{
-				yield return action();
+				// The condition is already met.
+				// No need to defer.
+				yield return action;
 				yield break;
 			}
 
@@ -29,10 +31,10 @@ namespace UnityXmlSerializer
 			});
 		}
 		
-		private IEnumerator Do_Deferment()
+		IEnumerator Do_Deferment()
 		{
 			int index = 0;
-
+			
 			while (index < deferred.Count)
 			{
 				yield return null;
@@ -41,7 +43,7 @@ namespace UnityXmlSerializer
 
 				if (deferment.Condition())
 				{
-					yield return deferment.Action();
+					yield return deferment.Action;
 
 					deferred.RemoveAt(index);
 
